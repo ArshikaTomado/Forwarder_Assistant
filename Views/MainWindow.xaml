@@ -278,17 +278,24 @@
                             <DataTemplate>
                                 <Grid Margin="0,3" Background="Transparent"
                                       MouseLeftButtonDown="OnMilestoneMouseDown" ToolTip="双击编辑该节点">
+                                    <!-- 列宽折中：两个文本列都吃 `*` 权重按比例收缩（谁也不被单独挤死），
+                                         各自 MinWidth 兜底；徽章/按钮改 Auto 钉在右侧，永远不被挤出面板。
+                                         文本超长时截断成 `…`，鼠标悬停 ToolTip 看完整内容。 -->
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="110" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="1.1*" MinWidth="52" />
+                                        <ColumnDefinition Width="1*" MinWidth="68" />
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" />
-                                    <TextBlock Grid.Column="1" Text="{Binding DueText}" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                               FontSize="12" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DueText}" VerticalAlignment="Center"
+                                               FontSize="12" Opacity="0.8" Margin="6,0"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding DueText}" />
                                     <Border Grid.Column="2" Background="{Binding StatusBrush}"
-                                            CornerRadius="4" Padding="8,3" HorizontalAlignment="Left">
+                                            CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding StatusText}" Foreground="White" FontSize="11" />
                                     </Border>
                                     <ui:Button Grid.Column="3" Appearance="Transparent" Padding="6,0" Margin="6,0,0,0"
