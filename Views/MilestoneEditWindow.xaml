@@ -1,0 +1,48 @@
+<!-- MilestoneEditWindow.xaml —— 节点新增 / 编辑对话框（加节点、双击节点行都会用到） -->
+<Window x:Class="ForwarderAssistant.Views.MilestoneEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="节点" Width="460" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" UseLayoutRounding="True">
+    <Border Padding="18" Background="{DynamicResource ApplicationBackgroundBrush}">
+        <StackPanel>
+            <TextBlock x:Name="TitleText" Text="加节点" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock x:Name="BlNoText" FontSize="12" Opacity="0.6" Margin="0,2,0,14" />
+
+            <TextBlock Text="节点名" FontSize="12" Opacity="0.8" Margin="0,0,0,4" />
+            <ui:TextBox x:Name="LabelBox" PlaceholderText="如：截关 / 开船 / 付费" />
+
+            <TextBlock Text="时间" FontSize="12" Opacity="0.8" Margin="0,14,0,4" />
+            <ComboBox x:Name="ModeBox" SelectedIndex="1">
+                <ComboBoxItem Content="精确时刻（到分）" />
+                <ComboBoxItem Content="仅日期（某一天）" />
+                <ComboBoxItem Content="不设时间（仅记录）" />
+            </ComboBox>
+
+            <!-- 日期 + 时间：选「仅日期」时时间框禁用，选「不设时间」时两者都禁用 -->
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <DatePicker x:Name="DateInput" Grid.Column="0"
+                            PreviewMouseLeftButtonDown="OnDatePreviewMouseDown" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:NumberBox x:Name="HourBox" Width="116" Minimum="0" Maximum="23" SmallChange="1"
+                                  SpinButtonPlacementMode="Inline" ClearButtonEnabled="False" />
+                    <TextBlock Text=":" VerticalAlignment="Center" Margin="4,0" FontSize="15" />
+                    <ui:NumberBox x:Name="MinuteBox" Width="116" Minimum="0" Maximum="59" SmallChange="1"
+                                  SpinButtonPlacementMode="Inline" ClearButtonEnabled="False" />
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <ui:Button Content="取消" Click="OnCancelClick" Margin="0,0,8,0" />
+                <ui:Button Content="保存" Appearance="Primary" Click="OnSaveClick" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

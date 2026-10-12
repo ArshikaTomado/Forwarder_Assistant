@@ -1,0 +1,319 @@
+<!-- MainWindow.xaml —— 主界面：工具条 + 左侧提单列表 + 右侧节点详情 -->
+<ui:FluentWindow x:Class="ForwarderAssistant.Views.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:tb="clr-namespace:H.NotifyIcon;assembly=H.NotifyIcon.Wpf"
+                 Title="货代提单节点提醒器"
+                 Height="720" Width="1400"
+                 MinHeight="520" MinWidth="1260"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True">
+
+    <Grid>
+        <Grid.Resources>
+            <!-- DataGrid 表头：内容居中 -->
+            <Style x:Key="ColHeader" TargetType="DataGridColumnHeader">
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Opacity" Value="0.65" />
+            </Style>
+            <!-- DataGrid 文本单元格：居中 + 超长省略 -->
+            <Style x:Key="CellText" TargetType="TextBlock">
+                <Setter Property="TextAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            </Style>
+            <!-- 节点名 / 节点时间：文字用「状态色」并加粗，和右侧状态标签同色，
+                 让整行一眼看出紧急度（超时=红、需要处理=橙…）。 -->
+            <Style x:Key="CellTextColored" TargetType="TextBlock" BasedOn="{StaticResource CellText}">
+                <Setter Property="Foreground" Value="{Binding StatusBrush}" />
+                <Setter Property="FontWeight" Value="Bold" />
+            </Style>
+            <!-- DataGrid 单元格容器：内容居中（模板列用） -->
+            <Style x:Key="CellBox" TargetType="DataGridCell">
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
+            <!-- 提单号列专用：双击复制挂在「单元格」上，用预览（隧道）事件——它一定先到单元格，
+                 不受 DataGrid 选中时抢鼠标捕获的影响（挂在格子里的子元素上时，第二次点击常收不到）。 -->
+            <Style x:Key="CellBoxCopyBlNo" TargetType="DataGridCell" BasedOn="{StaticResource CellBox}">
+                <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnCopyBlNoMouseDown" />
+            </Style>
+            <!-- 状态列头的筛选按钮：去掉按钮外观，只留文字，点一下弹筛选面板 -->
+            <Style x:Key="FilterHeaderToggle" TargetType="ToggleButton">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />  <!-- 标题栏 -->
+            <RowDefinition Height="Auto" />  <!-- 工具条 -->
+            <RowDefinition Height="*" />     <!-- 主体 -->
+            <RowDefinition Height="Auto" />  <!-- 状态栏 -->
+        </Grid.RowDefinitions>
+
+        <!-- 托盘图标（提醒主力）：不占界面空间，仅注册到系统托盘。
+             图标用 GeneratedIconSource 动态生成，免放 .ico 资源文件。 -->
+        <tb:TaskbarIcon x:Name="TrayIcon" ToolTipText="货代提单节点提醒器"
+                        TrayMouseDoubleClick="OnTrayShowClick">
+            <tb:TaskbarIcon.IconSource>
+                <!-- 托盘图标：按 128px 画布渲染再被系统缩到 16px，所以字号要占满画布、
+                     并给圆角，缩下去才不会糊成一团。 -->
+                <tb:GeneratedIconSource Text="货" FontFamily="Microsoft YaHei UI"
+                                        Foreground="White" Background="#0F6CBD"
+                                        Size="128" CornerRadius="26"
+                                        FontSize="88" FontWeight="Bold" />
+            </tb:TaskbarIcon.IconSource>
+            <!-- 托盘右键菜单：显示主窗口 / 退出（真正的退出入口，叉号只最小化） -->
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="显示主窗口" Click="OnTrayShowClick" />
+                    <MenuItem x:Name="AutoStartMenuItem" Header="开机自启" IsCheckable="True" Click="OnToggleAutoStartClick" />
+                    <Separator />
+                    <MenuItem Header="退出" Click="OnTrayExitClick" />
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+
+        <ui:TitleBar Grid.Row="0" Title="货代提单节点提醒器" />
+
+        <!-- 工具条 -->
+        <Grid Grid.Row="1" Margin="16,8,16,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <ui:TextBox Grid.Column="0" VerticalAlignment="Center"
+                        PlaceholderText="搜索 提单号 / 客户"
+                        Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="+ 新建" Appearance="Primary" Click="OnNewShipmentClick" />
+            <ui:Button Grid.Column="2" Margin="8,0,0,0" Content="船名 · 航次" Click="OnManageVoyagesClick"
+                       ToolTip="管理船名 / 航次：预览、重命名、删除不再使用的幽灵航次" />
+            <ui:Button Grid.Column="3" Margin="8,0,0,0" Content="导入 Excel" Click="OnImportExcelClick"
+                       ToolTip="从客户给的 Excel（.xlsx）批量追加导入提单；表头需含「船东提单号 / 船名 / 航次」" />
+            <!-- 临时：验证自绘右下角弹窗（第 3 步正式接上调度后删除） -->
+            <ui:Button Grid.Column="4" Margin="8,0,0,0" Content="测试提醒" Click="OnTestToastClick" />
+        </Grid>
+
+        <!-- 主体 -->
+        <Grid Grid.Row="2" Margin="16,0,16,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.6*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 左：提单列表（DataGrid 原生支持拖动列头调整列宽，表头与数据行自动同步） -->
+            <DataGrid Grid.Column="0" x:Name="ShipmentGrid"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
+                      CanUserResizeColumns="True"
+                      CanUserReorderColumns="False"
+                      SelectionMode="Extended"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="None"
+                      FontSize="12"
+                      RowHeight="30"
+                      Padding="0" BorderThickness="0"
+                      Background="Transparent"
+                      ItemsSource="{Binding Shipments}"
+                      SelectedItem="{Binding SelectedShipment}">
+                <DataGrid.Columns>
+                    <!-- 列宽原则：全部用 `*` 按权重「等比例分配」可用宽度，而不是固定像素。
+                         固定像素时各列之和一旦超过左栏宽度，带 `*` 的那列就会被压成 0（整列消失）；
+                         等比例分配则所有列一起收缩，谁也不被挤死；MinWidth 兜底保证表头文字不裁。
+                         权重≈原设计像素比例，用户仍可拖动列头自行微调。 -->
+                    <DataGridTemplateColumn Header="提单号" Width="1.25*" MinWidth="100"
+                                            HeaderStyle="{StaticResource ColHeader}"
+                                            CellStyle="{StaticResource CellBoxCopyBlNo}">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <!-- 双击整格任意处即可复制提单号；处理器挂在单元格上（见 CellBoxCopyBlNo 样式）。 -->
+                                <TextBlock Text="{Binding BlNo}" Style="{StaticResource CellText}"
+                                           Cursor="Hand" ToolTip="双击复制提单号" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="客户" Width="1*" MinWidth="80" Binding="{Binding Customer}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="船名" Width="1.3*" MinWidth="100" Binding="{Binding VesselName}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="航次" Width="0.75*" MinWidth="60" Binding="{Binding VoyageNo}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="起运港" Width="0.7*" MinWidth="64" Binding="{Binding Pol}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="卸货港" Width="0.7*" MinWidth="64" Binding="{Binding Pod}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="目的地" Width="0.7*" MinWidth="64" Binding="{Binding FinalDest}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="ETD" Width="1*" MinWidth="84" Binding="{Binding EtdText}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="ETA" Width="1*" MinWidth="84" Binding="{Binding EtaText}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellText}" />
+                    <DataGridTextColumn Header="节点名" Width="1*" MinWidth="72" Binding="{Binding NearestLabel}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellTextColored}" />
+                    <!-- 节点时间：显示文本与排序键分开 —— SortMemberPath 让列头排序走真实时间，
+                         而不是显示的那串文本（避免跨年、以及精确/仅日期节点混排时排错）。
+                         权重给得最大，因为「yyyy-MM-dd HH:mm」是最长的一串。 -->
+                    <DataGridTextColumn Header="节点时间" Width="1.6*" MinWidth="110" SortMemberPath="NearestDueSortKey"
+                                        Binding="{Binding NearestDueText}"
+                                        HeaderStyle="{StaticResource ColHeader}" ElementStyle="{StaticResource CellTextColored}" />
+                    <DataGridTemplateColumn Width="68" CanUserSort="False"
+                                            CellStyle="{StaticResource CellBox}">
+                        <DataGridTemplateColumn.Header>
+                            <StackPanel>
+                                <!-- 点这个列头弹出筛选面板；该列不参与排序，避免和筛选抢点击。
+                                     Popup 的开关由按钮的 Checked/Unchecked 事件驱动，不用绑定：
+                                     StaysOpen=False 会在打开时抓鼠标，与 IsChecked 双向绑定互相打架。 -->
+                                <ToggleButton x:Name="StatusHeaderToggle"
+                                              Style="{StaticResource FilterHeaderToggle}"
+                                              Checked="OnStatusHeaderToggleChecked"
+                                              Unchecked="OnStatusHeaderToggleUnchecked">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="状态" FontWeight="SemiBold" Opacity="0.65" />
+                                        <TextBlock Text="▾" Margin="3,0,0,0" FontWeight="SemiBold" Opacity="0.65" />
+                                    </StackPanel>
+                                </ToggleButton>
+                                <Popup x:Name="StatusFilterPopup"
+                                       PlacementTarget="{Binding ElementName=StatusHeaderToggle}"
+                                       Placement="Bottom" VerticalOffset="4"
+                                       AllowsTransparency="True" PopupAnimation="Fade"
+                                       StaysOpen="False"
+                                       Closed="OnStatusFilterPopupClosed">
+                                    <Border CornerRadius="8" Padding="10,8"
+                                            Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                                        <ItemsControl ItemsSource="{Binding StatusFilterOptions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox Content="{Binding Text}" Margin="2,4"
+                                                              IsChecked="{Binding IsChecked, Mode=TwoWay}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                </Popup>
+                            </StackPanel>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Background="{Binding StatusBrush}" CornerRadius="4" Padding="8,3">
+                                    <TextBlock Text="{Binding StatusText}" Foreground="White" FontSize="11" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- 右：选中提单的节点详情 -->
+            <Border Grid.Column="2" CornerRadius="8" Padding="14"
+                    Background="{DynamicResource ControlFillColorDefaultBrush}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <TextBlock Text="节点详情" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <ui:Button HorizontalAlignment="Right" Appearance="Primary" Padding="10,3"
+                                   Content="＋ 加节点" Click="OnAddMilestoneClick" />
+                    </Grid>
+                    <Grid Grid.Row="1" Margin="0,4,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <!-- 双击详情抬头提单号 → 复制到剪贴板。DataContext 指到选中行，供处理器读 BlNo。 -->
+                            <TextBlock Text="{Binding BlNo}" DataContext="{Binding SelectedShipment}"
+                                       Opacity="0.65" Cursor="Hand" ToolTip="双击复制提单号"
+                                       MouseLeftButtonDown="OnCopyBlNoMouseDown" />
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0" Opacity="0.5">
+                                <TextBlock Text="{Binding SelectedShipment.VesselName}" FontSize="12" />
+                                <TextBlock Text=" / " FontSize="12" />
+                                <TextBlock Text="{Binding SelectedShipment.VoyageNo}" FontSize="12" />
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:Button Appearance="Transparent" Padding="8,3" Content="修改提单"
+                                       Click="OnEditShipmentClick"
+                                       ToolTip="修改提单抬头信息（提单号 / 客户 / 船名航次 / 港口 / 日期）" />
+                            <ui:Button Appearance="Transparent" Padding="8,3" Foreground="#C42B1C"
+                                       Content="删除提单" Click="OnDeleteShipmentClick"
+                                       ToolTip="删除选中的提单（Ctrl / Shift 可多选），连同其全部节点（不可恢复）" />
+                        </StackPanel>
+                    </Grid>
+
+                    <ListView Grid.Row="2" ItemsSource="{Binding SelectedShipment.Milestones}"
+                              Background="Transparent" BorderThickness="0">
+                        <ListView.ItemContainerStyle>
+                            <!-- 让行内容撑满宽度，双击整行都能触发编辑 -->
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3" Background="Transparent"
+                                      MouseLeftButtonDown="OnMilestoneMouseDown" ToolTip="双击编辑该节点">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DueText}" VerticalAlignment="Center" FontSize="12" Opacity="0.8" />
+                                    <Border Grid.Column="2" Background="{Binding StatusBrush}"
+                                            CornerRadius="4" Padding="8,3" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding StatusText}" Foreground="White" FontSize="11" />
+                                    </Border>
+                                    <ui:Button Grid.Column="3" Appearance="Transparent" Padding="6,0" Margin="6,0,0,0"
+                                               Click="OnToggleMilestoneHandledClick" ToolTip="{Binding AckTooltip}">
+                                        <TextBlock Text="{Binding AckGlyph}" Foreground="{Binding AckBrush}"
+                                                   FontSize="20" FontWeight="Bold" />
+                                    </ui:Button>
+                                    <ui:Button Grid.Column="4" Appearance="Transparent" Padding="6,2" Margin="6,0,0,0"
+                                               Click="OnDeleteMilestoneClick" ToolTip="删除该节点">
+                                        <TextBlock Text="🗑" FontSize="13" />
+                                    </ui:Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 状态栏：左标数据存放位置，右为「已复制」之类的一次性轻提示 -->
+        <Grid Grid.Row="3" Margin="16,0,16,8">
+            <TextBlock FontSize="11" Opacity="0.45"
+                       Text="{Binding DataLocation}" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="CopyHintText" HorizontalAlignment="Right" FontSize="11"
+                       Foreground="#0F6CBD" Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

@@ -1,0 +1,99 @@
+<!-- VoyageManagerWindow.xaml —— 船名 · 航次管理窗格（预览 / 重命名 / 删除幽灵航次） -->
+<Window x:Class="ForwarderAssistant.Views.VoyageManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="船名 · 航次管理" Width="880" Height="560"
+        MinWidth="720" MinHeight="440"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" UseLayoutRounding="True">
+    <Border Padding="18" Background="{DynamicResource ApplicationBackgroundBrush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="船名 · 航次管理" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock Text="不再使用的幽灵航次可在此删除（Ctrl / Shift 可多选）；改错的船名 / 航次可重命名（在用提单会跟着一起改）。"
+                           FontSize="12" Opacity="0.6" Margin="0,2,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2.2*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- 左：全部航次总览 -->
+                <DataGrid Grid.Column="0" x:Name="VoyageGrid"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserResizeRows="False"
+                          CanUserReorderColumns="False"
+                          SelectionMode="Extended"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="None"
+                          FontSize="12"
+                          RowHeight="30"
+                          Padding="0" BorderThickness="0"
+                          Background="Transparent"
+                          SelectionChanged="OnVoyageSelectionChanged">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="船名" Width="1.6*" MinWidth="120" Binding="{Binding VesselName}" />
+                        <DataGridTextColumn Header="航次" Width="0.9*" MinWidth="70" Binding="{Binding VoyageNo}" />
+                        <DataGridTextColumn Header="挂靠港" Width="0.7*" MinWidth="60" Binding="{Binding PortCount}" />
+                        <DataGridTextColumn Header="提单数" Width="0.7*" MinWidth="60" Binding="{Binding ShipmentCount}" />
+                        <DataGridTextColumn Header="最近开航" Width="1*" MinWidth="90" Binding="{Binding LastDepartureText}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- 右：选中航次的明细（只读预览） -->
+                <Border Grid.Column="2" CornerRadius="8" Padding="14"
+                        Background="{DynamicResource ControlFillColorDefaultBrush}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="1.2*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" x:Name="DetailHeader" Text="（未选中）"
+                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Row="1" Text="挂靠港" FontSize="12" Opacity="0.6" Margin="0,10,0,4" />
+                        <ListBox Grid.Row="2" x:Name="PortsList" FontSize="12"
+                                 Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                        <TextBlock Grid.Row="3" Text="在用提单" FontSize="12" Opacity="0.6" Margin="0,10,0,4" />
+                        <ListBox Grid.Row="4" x:Name="ShipmentsList" FontSize="12"
+                                 Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 底：重命名 + 删除 -->
+            <Grid Grid.Row="2" Margin="0,14,0,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="船名" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="VesselBox" Width="180" Margin="6,0,12,0" />
+                    <TextBlock Text="航次" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                    <ui:TextBox x:Name="VoyageBox" Width="120" Margin="6,0,12,0" />
+                    <ui:Button x:Name="SaveButton" Content="保存修改" Appearance="Primary" Click="OnSaveClick" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <ui:Button x:Name="DeleteButton" Content="删除航次" Foreground="#C42B1C" Click="OnDeleteClick"
+                               Margin="0,0,8,0" ToolTip="删除选中的航次（Ctrl / Shift 可多选）；还有提单在用的会被跳过" />
+                    <ui:Button Content="关闭" Click="OnCloseClick" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

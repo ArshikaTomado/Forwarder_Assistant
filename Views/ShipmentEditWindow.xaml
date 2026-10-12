@@ -1,0 +1,69 @@
+<!-- ShipmentEditWindow.xaml —— 新建提单对话框（工具条「+ 新建」用） -->
+<Window x:Class="ForwarderAssistant.Views.ShipmentEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="新建提单" Width="440" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" UseLayoutRounding="True">
+    <Border Padding="18" Background="{DynamicResource ApplicationBackgroundBrush}">
+        <StackPanel>
+            <TextBlock x:Name="TitleText" Text="新建提单" FontSize="16" FontWeight="SemiBold" />
+            <TextBlock Text="带 * 为必填" FontSize="12" Opacity="0.6" Margin="0,2,0,14" />
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="72" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="提单号 *" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <ui:TextBox Grid.Row="0" Grid.Column="1" x:Name="BlNoBox" PlaceholderText="业务唯一键" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="客户 *" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <ui:TextBox Grid.Row="1" Grid.Column="1" x:Name="CustomerBox" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="船名 *" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <!-- 可编辑下拉：边打边筛历史船名，也可直接手打一条新的 -->
+                <ui:AutoSuggestBox Grid.Row="2" Grid.Column="1" x:Name="VesselBox"
+                                   PlaceholderText="如 EVER FOCUS，可挑历史船名" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="航次 *" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <ui:TextBox Grid.Row="3" Grid.Column="1" x:Name="VoyageBox" PlaceholderText="如 1100E" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="起运港" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <ui:TextBox Grid.Row="4" Grid.Column="1" x:Name="PolBox" PlaceholderText="UN/LOCODE，如 CNTAO" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="卸货港" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <ui:TextBox Grid.Row="5" Grid.Column="1" x:Name="PodBox" PlaceholderText="UN/LOCODE，如 USLAX" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="6" Grid.Column="0" Text="最终交货地" FontSize="12" Opacity="0.8" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <ui:TextBox Grid.Row="6" Grid.Column="1" x:Name="DestBox" PlaceholderText="最终交货地，UN/LOCODE，可空" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="7" Grid.Column="0" Text="ETD" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <DatePicker Grid.Row="7" Grid.Column="1" x:Name="EtdPicker" Margin="0,0,0,8"
+                            PreviewMouseLeftButtonDown="OnDatePreviewMouseDown" />
+
+                <TextBlock Grid.Row="8" Grid.Column="0" Text="ETA" FontSize="12" Opacity="0.8" VerticalAlignment="Center" />
+                <DatePicker Grid.Row="8" Grid.Column="1" x:Name="EtaPicker"
+                            PreviewMouseLeftButtonDown="OnDatePreviewMouseDown" />
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <ui:Button Content="取消" Click="OnCancelClick" Margin="0,0,8,0" />
+                <ui:Button Content="保存" Appearance="Primary" Click="OnSaveClick" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
