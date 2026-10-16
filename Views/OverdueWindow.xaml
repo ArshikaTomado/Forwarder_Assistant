@@ -32,10 +32,11 @@
 
                                     <StackPanel Grid.Column="1" Margin="10,0,12,0" VerticalAlignment="Center">
                                         <TextBlock FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis">
-                                            <Run Text="{Binding BlNo}" /><Run Text=" · " /><Run Text="{Binding Label}" />
+                                            <!-- Run.Text 默认是 TwoWay 绑定，这里的目标是只读属性，必须显式 OneWay（否则开窗即崩） -->
+                                            <Run Text="{Binding BlNo, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Label, Mode=OneWay}" />
                                         </TextBlock>
                                         <TextBlock FontSize="12" Opacity="0.7" Margin="0,2,0,0">
-                                            <Run Text="{Binding DueText}" /><Run Text=" · " /><Run Text="{Binding OverdueText}" />
+                                            <Run Text="{Binding DueText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding OverdueText, Mode=OneWay}" />
                                         </TextBlock>
                                     </StackPanel>
 
