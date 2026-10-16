@@ -295,6 +295,37 @@ public partial class MainViewModel : ObservableObject
     private static string ReminderKey(Milestone m)
         => $"{m.Id}|{MilestoneDisplay.SortKey(m).Ticks}";
 
+    // ================= 超时聚合提醒（第 3 步增强） =================
+
+    // 「稍后处理」的节点：节点Id → 该时刻(UTC)之前不再进超时提醒。只存内存，重启即失效（有意为之，省一个库字段）。
+    private readonly Dictionary<long, DateTime> _snoozeUntil = new();
+
+    /// <summary>当前「已超时且未在稍后中」的全部节点，供聚合气泡与详情窗共用；按超时时间升序（越早越前）。</summary>
+    public List<OverdueRow> GetOverdueRows(DateTime nowUtc)
+        => Shipments
+            .SelectMany(s => s.Milestones.Select(m => new OverdueRow(s, m)))
+            .Where(r => MilestoneStatusCalculator.Calc(r.Milestone.Model, nowUtc) == MilestoneStatus.Overdue)
+            .Where(r => !_snoozeUntil.TryGetValue(r.Milestone.Id, out var until) || nowUtc >= until)
+            .OrderBy(r => MilestoneDisplay.SortKey(r.Milestone.Model))
+            .ToList();
+
+    /// <summary>「稍后处理」：该节点在 untilUtc 之前不再进超时提醒（不落库，重启失效）。</summary>
+    public void SnoozeOverdue(long milestoneId, DateTime untilUtc) => _snoozeUntil[milestoneId] = untilUtc;
+
+    /// <summary>把节点标为「已处理」并落库（与节点行的圆圈对勾等价，但不做撤销——供超时详情窗用）。</summary>
+    public void MarkMilestoneHandled(ShipmentRowViewModel shipment, MilestoneRowViewModel row)
+    {
+        if (row.Model.AckAtUtc is not null) return;
+
+        row.Model.AckAtUtc = DateTime.UtcNow;
+        _service.UpdateMilestone(row.Model);
+
+        var now = DateTime.UtcNow;
+        row.Refresh(now);
+        shipment.Recompute(now);
+        _shipmentsView?.Refresh();
+    }
+
     // ================= 状态筛选 =================
 
     /// <summary>构建筛选面板：第一项「全部」，其后是五个官方状态；默认全选（= 不过滤）。</summary>
@@ -410,5 +441,42 @@ public partial class MainViewModel : ObservableObject
         if (obj is not MilestoneRowViewModel row) return false;
         var query = MilestoneSearchText.Trim();
         return query.Length == 0 || row.Label.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+/// <summary>超时详情窗里的一行：定位到具体提单与节点，并给出「已超多久」。</summary>
+public sealed class OverdueRow
+{
+    public ShipmentRowViewModel Shipment { get; }
+    public MilestoneRowViewModel Milestone { get; }
+
+    public string BlNo => Shipment.BlNo;
+    public string Label => Milestone.Label;
+    public string DueText => Milestone.DueText;
+
+    public OverdueRow(ShipmentRowViewModel shipment, MilestoneRowViewModel milestone)
+    {
+        Shipment = shipment;
+        Milestone = milestone;
+    }
+
+    /// <summary>「已超 N 天 / N 小时」——仅日期节点按天，精确节点不足一天按小时。</summary>
+    public string OverdueText
+    {
+        get
+        {
+            var now = DateTime.UtcNow;
+            if (Milestone.Model.DueDate is { } d)
+            {
+                var days = DateOnly.FromDateTime(now.ToLocalTime()).DayNumber - d.DayNumber;
+                return days <= 0 ? "今天超时" : $"已超 {days} 天";
+            }
+            if (Milestone.Model.DueAtUtc is { } t)
+            {
+                var span = now - t;
+                return span.TotalHours < 24 ? $"已超 {(int)span.TotalHours} 小时" : $"已超 {(int)span.TotalDays} 天";
+            }
+            return "";
+        }
     }
 }

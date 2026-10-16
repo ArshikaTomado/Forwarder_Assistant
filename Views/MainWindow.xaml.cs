@@ -113,13 +113,55 @@ public partial class MainWindow : FluentWindow
 
     // ================= 调度 / 提醒（第 3 步） =================
 
-    // 每 30 秒：重算列表状态，并对「刚进入需要处理」的节点弹一条自绘提醒。
+    // 超时聚合提醒的节流：同一批超时节点最多每 30 分钟提醒一次（心跳是 30 秒，不加节流会一直弹）。
+    private static readonly TimeSpan OverdueToastInterval = TimeSpan.FromMinutes(30);
+    private DateTime _nextOverdueToastUtc = DateTime.MinValue;
+
+    // 超时提醒的强调色（与「超时」状态同色）。
+    private static readonly Brush OverdueAccent = new SolidColorBrush(Color.FromRgb(0xE5, 0x39, 0x35));
+
+    // 每 30 秒：重算列表状态，并对「刚进入需要处理」的节点弹一条自绘提醒；
+    // 另把「超时未处理」的节点聚合成一条提醒，最多每 30 分钟弹一次。
     private void OnSchedulerTick(DateTime nowUtc)
     {
         Vm.RefreshAllStatuses(nowUtc);
 
         foreach (var (blNo, label) in Vm.CollectDueReminders(nowUtc))
             ToastWindow.Show($"节点提醒 · {label}", $"提单 {blNo} 的「{label}」到点了，请及时处理。");
+
+        if (nowUtc >= _nextOverdueToastUtc)
+        {
+            var overdue = Vm.GetOverdueRows(nowUtc);
+            if (overdue.Count > 0)
+            {
+                ShowOverdueToast(overdue);
+                _nextOverdueToastUtc = nowUtc + OverdueToastInterval;
+            }
+        }
+    }
+
+    // 把全部超时节点聚合成一条气泡（点它开详情窗逐条「已处理 / 稍后处理」），避免一堆气泡刷屏。
+    private void ShowOverdueToast(List<OverdueRow> rows)
+    {
+        var preview = string.Join("；", rows.Take(3).Select(r => $"提单 {r.BlNo}「{r.Label}」{r.OverdueText}"));
+        var message = rows.Count > 3
+            ? $"{preview} 等 {rows.Count} 项超时未处理，点此查看。"
+            : $"{preview}，点此查看。";
+
+        ToastWindow.Show($"超时提醒 · {rows.Count} 项", message,
+            accent: OverdueAccent, seconds: 12,
+            onCardClick: OpenOverdueWindow);
+    }
+
+    // 打开超时详情窗；打开时按当前时间重新取一遍（气泡显示到点击之间可能已有变化）。
+    private void OpenOverdueWindow()
+    {
+        var rows = Vm.GetOverdueRows(DateTime.UtcNow);
+        if (rows.Count == 0) return;
+
+        var window = new OverdueWindow(Vm, rows);
+        window.Show();
+        window.Activate();
     }
 
     // 托盘「开机自启」勾选：勾上写注册表 Run，取消就删掉（默认关）。

@@ -20,13 +20,17 @@ public partial class ToastWindow : Window
     private readonly DispatcherTimer _lifeTimer;
     private bool _closing;
 
-    private ToastWindow(string title, string message, Brush accent, int seconds)
+    // 点卡片时的自定义动作；为 null 表示默认行为（唤起主窗口）。超时汇总气泡用它开详情窗。
+    private readonly Action? _onCardClick;
+
+    private ToastWindow(string title, string message, Brush accent, int seconds, Action? onCardClick)
     {
         InitializeComponent();
 
         TitleText.Text = title;
         BodyText.Text = message;
         AccentBar.Background = accent;
+        _onCardClick = onCardClick;
 
         // 先透明，等布局完成再淡入，避免出现「先闪一下再归位」。
         Opacity = 0;
@@ -39,11 +43,13 @@ public partial class ToastWindow : Window
     }
 
     /// <summary>
-    /// 弹出右下角提醒。accent 为空时用应用主蓝色；seconds 为自动关闭秒数（鼠标悬停会暂停计时）。
+    /// 弹出右下角提醒。accent 为空时用应用主蓝色；seconds 为自动关闭秒数（鼠标悬停会暂停计时）；
+    /// onCardClick 为空时点卡片 = 唤起主窗口，否则执行自定义动作（超时汇总气泡用它开详情窗）。
     /// </summary>
-    public static void Show(string title, string message, Brush? accent = null, int seconds = 6)
+    public static void Show(string title, string message, Brush? accent = null, int seconds = 6,
+                            Action? onCardClick = null)
     {
-        var toast = new ToastWindow(title, message, accent ?? DefaultAccent, seconds);
+        var toast = new ToastWindow(title, message, accent ?? DefaultAccent, seconds, onCardClick);
 
         OpenToasts.Add(toast);
 
@@ -110,9 +116,16 @@ public partial class ToastWindow : Window
             _lifeTimer.Start();
     }
 
-    // 点击弹窗 → 唤起主窗口，并收起本条提醒。
+    // 点击弹窗 → 有自定义动作就执行（超时汇总开详情窗），否则唤起主窗口；两种情况都收起本条提醒。
     private void OnCardClick(object sender, MouseButtonEventArgs e)
     {
+        if (_onCardClick is { } action)
+        {
+            CloseWithFade();
+            action();
+            return;
+        }
+
         ActivateMainWindow();
         CloseWithFade();
     }

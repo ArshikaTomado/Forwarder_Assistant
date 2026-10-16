@@ -102,7 +102,9 @@ public static class ExcelImporter
             }
 
             var dest = GetText(ws, colOf, rn, Field.Dest);
-            result.Shipments.Add(new Shipment
+            var etaDate = GetDate(ws, colOf, rn, Field.Eta);
+
+            var shipment = new Shipment
             {
                 BlNo = blNo,
                 Customer = customer,
@@ -111,10 +113,27 @@ public static class ExcelImporter
                 Pod = pod,
                 FinalDestination = dest.Length > 0 ? dest : pod, // 目的港没填就用卸货港（与手动建单一致）
                 EtdUtc = ToUtc(GetDate(ws, colOf, rn, Field.Etd)),
-                EtaUtc = ToUtc(GetDate(ws, colOf, rn, Field.Eta)),
-            });
+                EtaUtc = ToUtc(etaDate),
+            };
+
+            AddAutoReminder(shipment, etaDate);
+            result.Shipments.Add(shipment);
         }
         return result;
+    }
+
+    /// <summary>导入即自动补的提醒：有 ETA 的提单，加一个「放单付费提醒」仅日期节点，定在 ETA 前 7 天。
+    /// 规则写死、不可配（见 项目计划）；落库时随提单一起写入（ShipmentRepository.Insert 会遍历 Milestones）。</summary>
+    private static void AddAutoReminder(Shipment s, DateTime? etaDate)
+    {
+        if (etaDate is null) return;
+
+        s.Milestones.Add(new Milestone
+        {
+            Kind = "custom",
+            Label = "放单付费提醒",
+            DueDate = DateOnly.FromDateTime(etaDate.Value.Date.AddDays(-7)),
+        });
     }
 
     /// <summary>把表头行映射成「字段 → 列号」：按字段定义顺序先到先得；一列已被先到的字段占用，

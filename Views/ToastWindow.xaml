@@ -5,7 +5,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False"
-        ResizeMode="NoResize" SizeToContent="Height" Width="380"
+        ResizeMode="NoResize" SizeToContent="Height" Width="440"
         WindowStartupLocation="Manual"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         TextOptions.TextFormattingMode="Display">
@@ -23,20 +23,20 @@
             <DropShadowEffect BlurRadius="14" ShadowDepth="2" Direction="270"
                               Color="#000000" Opacity="0.28" />
         </Border.Effect>
-        <Grid Margin="14,12">
+        <Grid Margin="16,14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- 左侧强调色竖条：颜色随提醒级别变化（超时=红、待处理=橙…） -->
-            <Border x:Name="AccentBar" Grid.Column="0" Width="4" CornerRadius="2"
+            <Border x:Name="AccentBar" Grid.Column="0" Width="5" CornerRadius="2"
                     VerticalAlignment="Stretch" Background="#0F6CBD" />
 
-            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                <TextBlock x:Name="TitleText" FontWeight="SemiBold" FontSize="13"
+            <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText" FontWeight="SemiBold" FontSize="14"
                            TextTrimming="CharacterEllipsis" />
-                <TextBlock x:Name="BodyText" FontSize="12" Opacity="0.75"
+                <TextBlock x:Name="BodyText" FontSize="13" Opacity="0.75"
                            TextWrapping="Wrap" Margin="0,3,0,0" />
             </StackPanel>
         </Grid>
