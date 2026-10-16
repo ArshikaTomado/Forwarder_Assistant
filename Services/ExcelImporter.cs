@@ -5,26 +5,55 @@ namespace ForwarderAssistant.Services;
 using ClosedXML.Excel;
 using ForwarderAssistant.Models;
 
-/// <summary>按列头名从 Excel 读出提单草稿。表头必须在第一行可见处，列顺序不限。</summary>
+/// <summary>按列头名从 Excel 读出提单草稿。表头必须在第一行可见处，列顺序不限；
+/// 每个字段接受一组别名（如「船东提单号 / 主提单号 / 提单号」），命中任一即可。</summary>
 public static class ExcelImporter
 {
-    /// <summary>解析结果：可用的提单草稿 + 被跳过的行说明（给人看的中文原因）。</summary>
+    /// <summary>解析结果：可用的提单草稿 + 被跳过的行说明 + 表头冲突等提示（均为给人看的中文）。</summary>
     public sealed class ParseResult
     {
         public List<Shipment> Shipments { get; } = new();
         public List<string> Skipped { get; } = new();
+        public List<string> Warnings { get; } = new();
     }
 
-    // 表头文字 → 目标字段。缺列时该项按空处理；「船东提单号 / 船名 / 航次」缺任一项直接报错。
-    private const string HBlNo = "船东提单号";
-    private const string HVessel = "船名";
-    private const string HVoyageNo = "航次";
-    private const string HEtd = "开航日期";
-    private const string HEta = "到达日期";
-    private const string HCustomer = "委托人";
-    private const string HPol = "装运港";
-    private const string HPod = "卸货港";
-    private const string HDest = "目的港";
+    /// <summary>目标字段。顺序即「同一列被多个字段命中」时先到先得的优先级。</summary>
+    private enum Field { BlNo, Vessel, VoyageNo, Etd, Eta, Customer, Pol, Pod, Dest }
+
+    private static readonly Field[] AllFields =
+    {
+        Field.BlNo, Field.Vessel, Field.VoyageNo, Field.Etd, Field.Eta,
+        Field.Customer, Field.Pol, Field.Pod, Field.Dest,
+    };
+
+    // 每个字段可接受的表头别名（不区分大小写）。缺列时该字段按空处理；
+    // 「提单号 / 船名 / 航次」缺任一项直接报错。不做「船名 / 航次」合成列的自动拆分。
+    private static readonly Dictionary<Field, string[]> Aliases = new()
+    {
+        [Field.BlNo] = new[] { "船东提单号", "主提单号", "提单号" },
+        [Field.Vessel] = new[] { "船名" },
+        [Field.VoyageNo] = new[] { "航次" },
+        [Field.Etd] = new[] { "开航日期", "开船日期", "开航期", "ETD" },
+        [Field.Eta] = new[] { "到达日期", "到港日期", "到港期", "ETA" },
+        [Field.Customer] = new[] { "委托人", "客户", "客户名称" },
+        [Field.Pol] = new[] { "装运港", "起运港", "装货港", "POL" },
+        [Field.Pod] = new[] { "卸货港", "POD" },
+        [Field.Dest] = new[] { "目的港", "最终目的地", "最终交货地" },
+    };
+
+    /// <summary>字段的中文显示名（报错与提示用）。</summary>
+    private static readonly Dictionary<Field, string> DisplayNames = new()
+    {
+        [Field.BlNo] = "提单号",
+        [Field.Vessel] = "船名",
+        [Field.VoyageNo] = "航次",
+        [Field.Etd] = "开航日期",
+        [Field.Eta] = "到达日期",
+        [Field.Customer] = "委托人",
+        [Field.Pol] = "装运港",
+        [Field.Pod] = "卸货港",
+        [Field.Dest] = "目的港",
+    };
 
     /// <summary>读第一个工作表，返回提单草稿与被跳过的行说明。</summary>
     /// <exception cref="InvalidOperationException">文件不可读 / 空表 / 缺关键列时抛出，消息可直接展示给用户。</exception>
@@ -39,28 +68,26 @@ public static class ExcelImporter
         var headerRow = used.FirstRow().RowNumber();
         var lastRow = used.LastRow().RowNumber();
 
-        // 表头文字 → 列号（第一行见到的表头为准，重复表头取首个）
-        var col = new Dictionary<string, int>();
-        foreach (var cell in ws.Row(headerRow).CellsUsed())
-        {
-            var name = ReadText(cell);
-            if (name.Length > 0 && !col.ContainsKey(name)) col[name] = cell.Address.ColumnNumber;
-        }
-
-        var missing = new[] { HBlNo, HVessel, HVoyageNo }.Where(h => !col.ContainsKey(h)).ToList();
-        if (missing.Count > 0)
-            throw new InvalidOperationException(
-                $"Excel 缺少必需列：{string.Join("、", missing)}。\n请确认表头包含「{HBlNo} / {HVessel} / {HVoyageNo}」。");
-
         var result = new ParseResult();
+
+        // 表头文字 → 字段的列映射（按别名命中；同列冲突先到先得，落败方进 Warnings）
+        var colOf = MapColumns(ws, headerRow, result.Warnings);
+
+        var missing = new[] { Field.BlNo, Field.Vessel, Field.VoyageNo }
+            .Where(f => !colOf.ContainsKey(f))
+            .Select(f => $"{DisplayNames[f]}（可接受的表头：{string.Join(" / ", Aliases[f])}）")
+            .ToList();
+        if (missing.Count > 0)
+            throw new InvalidOperationException("Excel 缺少必需列：\n" + string.Join("\n", missing));
+
         for (var rn = headerRow + 1; rn <= lastRow; rn++)
         {
-            var blNo = GetText(ws, col, rn, HBlNo);
-            var vessel = GetText(ws, col, rn, HVessel);
-            var voyageNo = GetText(ws, col, rn, HVoyageNo);
-            var customer = GetText(ws, col, rn, HCustomer);
-            var pol = GetText(ws, col, rn, HPol);
-            var pod = GetText(ws, col, rn, HPod);
+            var blNo = GetText(ws, colOf, rn, Field.BlNo);
+            var vessel = GetText(ws, colOf, rn, Field.Vessel);
+            var voyageNo = GetText(ws, colOf, rn, Field.VoyageNo);
+            var customer = GetText(ws, colOf, rn, Field.Customer);
+            var pol = GetText(ws, colOf, rn, Field.Pol);
+            var pod = GetText(ws, colOf, rn, Field.Pod);
 
             // 整行空白（关心的列全空）→ 静默跳过
             if (blNo.Length == 0 && vessel.Length == 0 && voyageNo.Length == 0
@@ -74,7 +101,7 @@ public static class ExcelImporter
                 continue;
             }
 
-            var dest = GetText(ws, col, rn, HDest);
+            var dest = GetText(ws, colOf, rn, Field.Dest);
             result.Shipments.Add(new Shipment
             {
                 BlNo = blNo,
@@ -83,20 +110,53 @@ public static class ExcelImporter
                 Pol = pol,
                 Pod = pod,
                 FinalDestination = dest.Length > 0 ? dest : pod, // 目的港没填就用卸货港（与手动建单一致）
-                EtdUtc = ToUtc(GetDate(ws, col, rn, HEtd)),
-                EtaUtc = ToUtc(GetDate(ws, col, rn, HEta)),
+                EtdUtc = ToUtc(GetDate(ws, colOf, rn, Field.Etd)),
+                EtaUtc = ToUtc(GetDate(ws, colOf, rn, Field.Eta)),
             });
         }
         return result;
     }
 
-    /// <summary>按表头名取该行文字；表里没有这一列则返回空串。</summary>
-    private static string GetText(IXLWorksheet ws, Dictionary<string, int> col, int rn, string header)
-        => col.TryGetValue(header, out var c) ? ReadText(ws.Cell(rn, c)) : string.Empty;
+    /// <summary>把表头行映射成「字段 → 列号」：按字段定义顺序先到先得；一列已被先到的字段占用，
+    /// 后到的字段不能再取它。若一列头同时还能对上后面的某个字段，则给落败方记一条提示。</summary>
+    private static Dictionary<Field, int> MapColumns(IXLWorksheet ws, int headerRow, List<string> warnings)
+    {
+        var headers = ws.Row(headerRow).CellsUsed()
+            .Select(c => (Col: c.Address.ColumnNumber, Name: ReadText(c)))
+            .Where(h => h.Name.Length > 0)
+            .ToList();
 
-    /// <summary>按表头名取该行日期；表里没有这一列则返回 null。</summary>
-    private static DateTime? GetDate(IXLWorksheet ws, Dictionary<string, int> col, int rn, string header)
-        => col.TryGetValue(header, out var c) ? ReadDate(ws.Cell(rn, c)) : null;
+        var colOf = new Dictionary<Field, int>();
+        for (var i = 0; i < AllFields.Length; i++)
+        {
+            var field = AllFields[i];
+            var used = new HashSet<int>(colOf.Values);
+            var hit = headers.FirstOrDefault(h =>
+                !used.Contains(h.Col) && Aliases[field].Any(a => HeaderEquals(h.Name, a)));
+            if (hit.Name is null) continue;   // 该字段没有可用列
+
+            colOf[field] = hit.Col;
+
+            // 这一列头同时也能对上后面的某个字段 → 落败方记一条提示（先到先得）
+            foreach (var other in AllFields.Skip(i + 1))
+                if (Aliases[other].Any(a => HeaderEquals(hit.Name, a)))
+                    warnings.Add($"表头「{hit.Name}」既像「{DisplayNames[field]}」又像「{DisplayNames[other]}」，"
+                                 + $"已按先到先得取用「{DisplayNames[field]}」。");
+        }
+        return colOf;
+    }
+
+    /// <summary>表头文字比对：不区分大小写。</summary>
+    private static bool HeaderEquals(string a, string b)
+        => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>按字段取该行文字；表里没有这个字段的列则返回空串。</summary>
+    private static string GetText(IXLWorksheet ws, Dictionary<Field, int> colOf, int rn, Field field)
+        => colOf.TryGetValue(field, out var c) ? ReadText(ws.Cell(rn, c)) : string.Empty;
+
+    /// <summary>按字段取该行日期；表里没有这个字段的列则返回 null。</summary>
+    private static DateTime? GetDate(IXLWorksheet ws, Dictionary<Field, int> colOf, int rn, Field field)
+        => colOf.TryGetValue(field, out var c) ? ReadDate(ws.Cell(rn, c)) : null;
 
     /// <summary>单元格取文字（去掉首尾空白；数字、文本都按显示值取）。</summary>
     private static string ReadText(IXLCell cell)

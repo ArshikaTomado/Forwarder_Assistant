@@ -149,7 +149,8 @@ public partial class MainWindow : FluentWindow
         Vm.Reload();
     }
 
-    // 点「导入 Excel」：选客户给的 .xlsx，追加导入提单；完事刷新主列表并报告跳过的行。
+    // 点「导入 Excel」：选客户给的 .xlsx，解析后比对库中已有提单号。
+    // 无重复 → 按老流程直接全量导入、只报结果；有重复 → 弹预览窗逐条勾选后再落库。
     private void OnImportExcelClick(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
@@ -159,25 +160,47 @@ public partial class MainWindow : FluentWindow
         };
         if (dialog.ShowDialog(this) != true) return;
 
+        var service = new ShipmentService();
         try
         {
-            var (imported, skipped) = new ShipmentService().ImportExcel(dialog.FileName);
-            Vm.Reload();
+            var preview = service.PreviewExcel(dialog.FileName);
 
-            var message = $"导入完成：新增 {imported} 张提单。";
-            if (skipped.Count > 0)
+            // 无重复：直接全量导入，不弹预览框（不给常见情况加摩擦）。
+            if (preview.DuplicateCount == 0)
             {
-                message += $"\n\n跳过 {skipped.Count} 行：\n" + string.Join("\n", skipped.Take(15));
-                if (skipped.Count > 15) message += $"\n… 其余 {skipped.Count - 15} 行同理。";
+                var imported = service.ImportShipments(preview.Items.Select(i => i.Shipment));
+                Vm.Reload();
+                ShowImportReport($"导入完成：新增 {imported} 张提单。", preview.Warnings, preview.Skipped);
+                return;
             }
-            System.Windows.MessageBox.Show(this, message, "导入 Excel",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+
+            // 有重复：弹预览，勾选后由预览窗落库。
+            var window = new ImportPreviewWindow(preview) { Owner = this };
+            window.ShowDialog();
+            Vm.Reload();
+            if (window.ImportedCount > 0)
+                ShowImportReport($"导入完成：新增 {window.ImportedCount} 张提单。", null, null);
         }
         catch (Exception ex)
         {
             System.Windows.MessageBox.Show(this, "导入失败：\n" + ex.Message, "导入 Excel",
                 System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
         }
+    }
+
+    // 导入结果提示：正文 + 可选的表头提示 / 跳过行（有才附）。
+    private void ShowImportReport(string headline, List<string>? warnings, List<string>? skipped)
+    {
+        var message = headline;
+        if (warnings is { Count: > 0 })
+            message += "\n\n提示：\n" + string.Join("\n", warnings);
+        if (skipped is { Count: > 0 })
+        {
+            message += $"\n\n跳过 {skipped.Count} 行：\n" + string.Join("\n", skipped.Take(15));
+            if (skipped.Count > 15) message += $"\n… 其余 {skipped.Count - 15} 行同理。";
+        }
+        System.Windows.MessageBox.Show(this, message, "导入 Excel",
+            System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
     }
 
     // 点详情面板的「修改提单」：弹编辑表单（回填现值），确认后落库并刷新。

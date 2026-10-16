@@ -1,0 +1,64 @@
+<!-- ImportPreviewWindow.xaml —— Excel 导入预览：逐条勾选后落库（有重复项时才弹） -->
+<Window x:Class="ForwarderAssistant.Views.ImportPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="导入预览" Width="920" Height="620"
+        MinWidth="760" MinHeight="460"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" UseLayoutRounding="True">
+    <Border Padding="18" Background="{DynamicResource ApplicationBackgroundBrush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                <TextBlock Text="导入预览" FontSize="16" FontWeight="SemiBold" />
+                <TextBlock x:Name="SummaryText" FontSize="12" Opacity="0.7" Margin="0,4,0,0" TextWrapping="Wrap" />
+                <TextBlock x:Name="NoteText" FontSize="12" Opacity="0.6" Margin="0,4,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                <ui:Button Content="全部勾选" Margin="0,0,8,0" Click="OnSelectAllClick" />
+                <ui:Button Content="全部不勾" Click="OnSelectNoneClick" />
+            </StackPanel>
+
+            <DataGrid Grid.Row="2" x:Name="PreviewGrid"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
+                      CanUserReorderColumns="False"
+                      SelectionMode="Single"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="None"
+                      FontSize="12"
+                      RowHeight="30"
+                      Padding="0" BorderThickness="0"
+                      Background="Transparent">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="选" Width="44"
+                                            Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" />
+                    <DataGridTextColumn Header="提单号" Width="1.6*" MinWidth="120" IsReadOnly="True" Binding="{Binding BlNo}" />
+                    <DataGridTextColumn Header="状态" Width="0.9*" MinWidth="70" IsReadOnly="True" Binding="{Binding StatusText}" />
+                    <DataGridTextColumn Header="客户" Width="1.2*" MinWidth="80" IsReadOnly="True" Binding="{Binding Customer}" />
+                    <DataGridTextColumn Header="船名" Width="1.2*" MinWidth="80" IsReadOnly="True" Binding="{Binding VesselName}" />
+                    <DataGridTextColumn Header="航次" Width="0.8*" MinWidth="60" IsReadOnly="True" Binding="{Binding VoyageNo}" />
+                    <DataGridTextColumn Header="装" Width="0.8*" MinWidth="60" IsReadOnly="True" Binding="{Binding Pol}" />
+                    <DataGridTextColumn Header="卸" Width="0.8*" MinWidth="60" IsReadOnly="True" Binding="{Binding Pod}" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <Grid Grid.Row="3" Margin="0,14,0,0">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <ui:Button x:Name="ImportButton" Content="导入" Appearance="Primary" Margin="0,0,8,0" Click="OnImportClick" />
+                    <ui:Button Content="取消" Click="OnCancelClick" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

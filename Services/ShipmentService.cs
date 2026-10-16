@@ -56,14 +56,40 @@ public class ShipmentService
     /// <summary>删除一张提单（连同其全部节点）。</summary>
     public void DeleteShipment(long shipmentId) => _repo.DeleteShipment(shipmentId);
 
-    /// <summary>从 Excel（.xlsx）追加导入提单：解析 → 逐条落库（航次按「船名 + 航次」自动复用/新建）。
-    /// 返回成功条数与被跳过行的说明。</summary>
-    public (int Imported, List<string> Skipped) ImportExcel(string path)
+    /// <summary>导入预览：解析 Excel（.xlsx）并对照库中已有提单号，逐条标出是否重复——**不落库**。
+    /// 比对范围只比「导入行 vs 库已有」，不查表内；归一化 = Trim + 忽略大小写。</summary>
+    public ImportPreview PreviewExcel(string path)
     {
         Database.EnsureCreated();
         var parsed = ExcelImporter.Read(path);
-        foreach (var s in parsed.Shipments)
-            _repo.Insert(s);
-        return (parsed.Shipments.Count, parsed.Skipped);
+
+        var existing = new HashSet<string>(
+            _repo.LoadExistingBlNos().Select(NormalizeBlNo), StringComparer.OrdinalIgnoreCase);
+
+        var items = parsed.Shipments
+            .Select(s => new ImportPreviewItem
+            {
+                Shipment = s,
+                IsDuplicate = existing.Contains(NormalizeBlNo(s.BlNo)),
+            })
+            .ToList();
+
+        return new ImportPreview { Items = items, Skipped = parsed.Skipped, Warnings = parsed.Warnings };
     }
+
+    /// <summary>把选中的提单逐条落库（一律作新增插入，航次按「船名 + 航次」自动复用/新建）。返回成功条数。</summary>
+    public int ImportShipments(IEnumerable<Shipment> shipments)
+    {
+        Database.EnsureCreated();
+        var count = 0;
+        foreach (var s in shipments)
+        {
+            _repo.Insert(s);
+            count++;
+        }
+        return count;
+    }
+
+    /// <summary>提单号归一化：去首尾空白（大小写由比较器忽略）。</summary>
+    private static string NormalizeBlNo(string blNo) => blNo.Trim();
 }
