@@ -25,6 +25,14 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = "";
 
+    /// <summary>节点搜索词（按节点名过滤右侧详情列表）。纯内存匹配，边打边过滤；换提单时清空。</summary>
+    [ObservableProperty]
+    private string _milestoneSearchText = "";
+
+    /// <summary>右侧节点列表的过滤视图：跟随当前选中提单的节点集合，随搜索词实时过滤。</summary>
+    [ObservableProperty]
+    private ICollectionView? _milestoneView;
+
     /// <summary>数据存放位置说明（便携 / 用户目录），显示在底部状态栏</summary>
     public string DataLocation { get; } =
         (AppPaths.IsPortable ? "便携数据：" : "数据位置：") + AppPaths.DataRoot;
@@ -374,4 +382,33 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>搜索词一变就重新过滤（实时搜索）。</summary>
     partial void OnSearchTextChanged(string value) => _shipmentsView?.Refresh();
+
+    // ================= 节点搜索（右侧详情列表） =================
+
+    /// <summary>选中提单变化：把节点列表视图切到该提单的节点集合，并清空节点搜索词
+    /// （否则换到另一张提单会看到「莫名被过滤空」的列表）。</summary>
+    partial void OnSelectedShipmentChanged(ShipmentRowViewModel? value)
+    {
+        if (value is null)
+        {
+            MilestoneView = null;
+            return;
+        }
+
+        var view = CollectionViewSource.GetDefaultView(value.Milestones);
+        view.Filter = FilterMilestone;
+        MilestoneView = view;
+        MilestoneSearchText = "";
+    }
+
+    /// <summary>节点搜索词一变就重新过滤右侧节点列表（实时搜索）。</summary>
+    partial void OnMilestoneSearchTextChanged(string value) => MilestoneView?.Refresh();
+
+    /// <summary>节点过滤谓词：按节点名不区分大小写匹配；搜索词为空则不限制。</summary>
+    private bool FilterMilestone(object obj)
+    {
+        if (obj is not MilestoneRowViewModel row) return false;
+        var query = MilestoneSearchText.Trim();
+        return query.Length == 0 || row.Label.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
 }

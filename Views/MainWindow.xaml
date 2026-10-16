@@ -91,22 +91,34 @@
         <Grid Grid.Row="1" Margin="16,8,16,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />  <!-- ＋ 新建 -->
+                <ColumnDefinition Width="Auto" />  <!-- 修改提单 -->
+                <ColumnDefinition Width="Auto" />  <!-- 删除提单 -->
+                <ColumnDefinition Width="Auto" />  <!-- 导入 Excel / 船名 · 航次（上下堆叠） -->
+                <ColumnDefinition Width="Auto" />  <!-- 测试提醒 -->
             </Grid.ColumnDefinitions>
 
             <ui:TextBox Grid.Column="0" VerticalAlignment="Center"
                         PlaceholderText="搜索 提单号 / 客户"
                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
-            <ui:Button Grid.Column="1" Margin="8,0,0,0" Content="+ 新建" Appearance="Primary" Click="OnNewShipmentClick" />
-            <ui:Button Grid.Column="2" Margin="8,0,0,0" Content="船名 · 航次" Click="OnManageVoyagesClick"
-                       ToolTip="管理船名 / 航次：预览、重命名、删除不再使用的幽灵航次" />
-            <ui:Button Grid.Column="3" Margin="8,0,0,0" Content="导入 Excel" Click="OnImportExcelClick"
-                       ToolTip="从客户给的 Excel（.xlsx）批量追加导入提单；表头需含「船东提单号 / 船名 / 航次」" />
+            <!-- 提单级操作：新建 / 修改 / 删除 挨在一起（都作用于列表中选中的那一行）。 -->
+            <ui:Button Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center"
+                       Content="+ 新建" Appearance="Primary" Click="OnNewShipmentClick" />
+            <ui:Button Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center"
+                       Content="修改提单" Click="OnEditShipmentClick"
+                       ToolTip="修改提单抬头信息（提单号 / 客户 / 船名航次 / 港口 / 日期）" />
+            <ui:Button Grid.Column="3" Margin="8,0,0,0" VerticalAlignment="Center"
+                       Content="删除提单" Foreground="#C42B1C" Click="OnDeleteShipmentClick"
+                       ToolTip="删除选中的提单（Ctrl / Shift 可多选），连同其全部节点（不可恢复）" />
+            <!-- 数据维护类：导入 Excel 叠在「船名 · 航次」上方（上下两格）。 -->
+            <StackPanel Grid.Column="4" Margin="8,0,0,0" VerticalAlignment="Center">
+                <ui:Button Content="导入 Excel" Click="OnImportExcelClick" Margin="0,0,0,6"
+                           ToolTip="从客户给的 Excel（.xlsx）批量追加导入提单；表头需含「船东提单号 / 船名 / 航次」" />
+                <ui:Button Content="船名 · 航次" Click="OnManageVoyagesClick"
+                           ToolTip="管理船名 / 航次：预览、重命名、删除不再使用的幽灵航次" />
+            </StackPanel>
             <!-- 临时：验证自绘右下角弹窗（第 3 步正式接上调度后删除） -->
-            <ui:Button Grid.Column="4" Margin="8,0,0,0" Content="测试提醒" Click="OnTestToastClick" />
+            <ui:Button Grid.Column="5" Margin="8,0,0,0" VerticalAlignment="Center" Content="测试提醒" Click="OnTestToastClick" />
         </Grid>
 
         <!-- 主体 -->
@@ -235,37 +247,34 @@
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0">
-                        <TextBlock Text="节点详情" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <ui:Button HorizontalAlignment="Right" Appearance="Primary" Padding="10,3"
-                                   Content="＋ 加节点" Click="OnAddMilestoneClick" />
-                    </Grid>
-                    <Grid Grid.Row="1" Margin="0,4,0,10">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <!-- 双击详情抬头提单号 → 复制到剪贴板。DataContext 指到选中行，供处理器读 BlNo。 -->
-                            <TextBlock Text="{Binding BlNo}" DataContext="{Binding SelectedShipment}"
-                                       Opacity="0.65" Cursor="Hand" ToolTip="双击复制提单号"
-                                       MouseLeftButtonDown="OnCopyBlNoMouseDown" />
-                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0" Opacity="0.5">
-                                <TextBlock Text="{Binding SelectedShipment.VesselName}" FontSize="12" />
-                                <TextBlock Text=" / " FontSize="12" />
-                                <TextBlock Text="{Binding SelectedShipment.VoyageNo}" FontSize="12" />
-                            </StackPanel>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:Button Appearance="Transparent" Padding="8,3" Content="修改提单"
-                                       Click="OnEditShipmentClick"
-                                       ToolTip="修改提单抬头信息（提单号 / 客户 / 船名航次 / 港口 / 日期）" />
-                            <ui:Button Appearance="Transparent" Padding="8,3" Foreground="#C42B1C"
-                                       Content="删除提单" Click="OnDeleteShipmentClick"
-                                       ToolTip="删除选中的提单（Ctrl / Shift 可多选），连同其全部节点（不可恢复）" />
-                        </StackPanel>
+                        <TextBlock Grid.Column="0" Text="节点详情" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <!-- 节点搜索：按节点名实时过滤下面的节点列表（切提单时自动清空）。 -->
+                        <ui:TextBox Grid.Column="1" Margin="10,0" VerticalAlignment="Center"
+                                    PlaceholderText="搜索 节点名"
+                                    Text="{Binding MilestoneSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:Button Grid.Column="2" Appearance="Primary" Padding="10,3"
+                                   Content="＋ 加节点" Click="OnAddMilestoneClick" />
                     </Grid>
+                    <!-- 抬头信息：提单号（双击复制）+ 船名 / 航次。
+                         修改 / 删除提单已上移到顶部工具条，与「＋ 新建」并排。 -->
+                    <StackPanel Grid.Row="1" Margin="0,4,0,10">
+                        <!-- 双击详情抬头提单号 → 复制到剪贴板。DataContext 指到选中行，供处理器读 BlNo。 -->
+                        <TextBlock Text="{Binding BlNo}" DataContext="{Binding SelectedShipment}"
+                                   Opacity="0.65" Cursor="Hand" ToolTip="双击复制提单号"
+                                   MouseLeftButtonDown="OnCopyBlNoMouseDown" />
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0" Opacity="0.5">
+                            <TextBlock Text="{Binding SelectedShipment.VesselName}" FontSize="12" />
+                            <TextBlock Text=" / " FontSize="12" />
+                            <TextBlock Text="{Binding SelectedShipment.VoyageNo}" FontSize="12" />
+                        </StackPanel>
+                    </StackPanel>
 
-                    <ListView Grid.Row="2" ItemsSource="{Binding SelectedShipment.Milestones}"
+                    <ListView Grid.Row="2" ItemsSource="{Binding MilestoneView}"
                               Background="Transparent" BorderThickness="0">
                         <ListView.ItemContainerStyle>
                             <!-- 让行内容撑满宽度，双击整行都能触发编辑 -->
