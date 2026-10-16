@@ -41,17 +41,17 @@
     第 0 步只放 GUI 必需的：MVVM + WPF-UI。
     其余（Microsoft.Data.Sqlite / Quartz / Tomlyn / H.NotifyIcon.Wpf /
     Microsoft.Toolkit.Uwp.Notifications）在后续步骤用到时再加，一次只引入一层风险。
-    版本先用浮动号，确认可还原后再钉死具体版本。
+    版本已钉死（2026-10-16，锁定此前实际解析到的版本），确保任何机器、任何时候还原结果一致。
   -->
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
-    <PackageReference Include="WPF-UI" Version="3.*" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="WPF-UI" Version="3.1.1" />
     <!-- 第 1 步：本地 SQLite（Data 层）。bundle_e_sqlite3 自带原生库，单文件发布可自解压。 -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.*" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.31" />
     <!-- 提醒主力：托盘图标 + 托盘气泡（免 AUMID / 免开始菜单快捷方式，与绿色便携兼容）。 -->
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.2" />
     <!-- 第 4 步：读客户给的 Excel（.xlsx）批量导入提单。只做读取，不写回。 -->
-    <PackageReference Include="ClosedXML" Version="0.105.*" />
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
   </ItemGroup>
 
 </Project>
